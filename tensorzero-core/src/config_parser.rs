@@ -108,6 +108,15 @@ pub struct GatewayConfig {
     // If set, all of the HTTP endpoints will have this path prepended.
     // E.g. a base path of `/custom/prefix` will cause the inference endpoint to become `/custom/prefix/inference`.
     pub base_path: Option<String>,
+    pub admin_token: Option<String>,
+    pub auth_config: Option<AuthConfig>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AuthConfig {
+    pub enabled: bool,
+    pub require_tupleap_authcode: bool,
+    pub exempt_paths: Option<Vec<String>>, // paths that don't require auth
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -1304,6 +1313,29 @@ mod tests {
         assert_eq!(
             config.tools.get("get_temperature_with_name").unwrap().name,
             "get_temperature"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_config_gateway_auth() {
+        let config = get_sample_valid_config();
+        let base_path = PathBuf::new();
+        // Test with a valid bind address
+        let parsed_config = Config::load_from_toml(config.clone(), base_path.clone())
+            .await
+            .unwrap();
+        assert_eq!(
+            parsed_config.gateway.admin_token.unwrap().to_string(),
+            "I_AM_ADMIN_THE_GREAT"
+        );
+        let auth_config = parsed_config.gateway.auth_config;
+        assert_eq!(
+            auth_config.unwrap(),
+            AuthConfig {
+                enabled: true,
+                require_tupleap_authcode: true,
+                exempt_paths: None,
+            }
         );
     }
 

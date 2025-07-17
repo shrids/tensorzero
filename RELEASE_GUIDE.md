@@ -37,7 +37,7 @@ Every time you want to build the Docker container, you need to run from the root
 DOCKER_BUILDKIT=1 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   -t tensorzero/gateway:latest \
-  -t tensorzero/gateway:XXXX.XX.X \
+  -t tensorzero/gateway:san.0.1 \
   -f gateway/Dockerfile \
   --attest type=provenance,mode=max \
   --attest type=sbom \

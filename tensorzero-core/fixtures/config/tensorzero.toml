@@ -4,6 +4,11 @@
 
 [gateway]
 bind_address = "0.0.0.0:3000"
+admin_token = "I_AM_ADMIN_THE_GREAT"
+
+[gateway.auth_config]
+enabled = true
+require_tupleap_authcode = true
 
 # ┌────────────────────────────────────────────────────────────────────────────┐
 # │                                   MODELS                                   │
