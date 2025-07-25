@@ -82,61 +82,19 @@ async fn validate_auth_code_from_db(
 
 pub async fn increment_usage_and_stats(
     auth_code: &str,
-    auth_info: &AuthInfo,
     app_state: &AppStateData,
 ) -> Result<(), Error> {
-    // // Increment usage counter
-    // let usage_query = r#"
-    //     ALTER TABLE tupleap_auth_codes
-    //     UPDATE usage_count = usage_count + 1
-    //     WHERE auth_code = ?
-    // "#;
-
-    // // Insert API access log
-    // let stats_query = r#"
-    //     INSERT INTO tupleap_api_stats
-    //     (auth_code, tenant_id, username, api_endpoint, access_time, request_id)
-    //     VALUES (?, ?, ?, ?, now(), ?)
-    // "#;
-
-    // match &app_state.clickhouse_connection_info {
-    //     ClickHouseConnectionInfo::Production { client, .. } => {
-    //         // Update usage count
-    //         client
-    //             .query(usage_query)
-    //             .bind(auth_code)
-    //             .execute()
-    //             .await
-    //             .map_err(|e| {
-    //                 Error::new(ErrorDetails::ClickHouseQuery {
-    //                     message: format!("Failed to increment usage counter: {}", e),
-    //                 })
-    //             })?;
-
-    //         // Insert stats record
-    //         let request_id = uuid::Uuid::new_v4().to_string();
-    //         client
-    //             .query(stats_query)
-    //             .bind(auth_code)
-    //             .bind(&auth_info.tenant_id)
-    //             .bind(&auth_info.username)
-    //             .bind("api_call") // Could be dynamic based on endpoint
-    //             .bind(&request_id)
-    //             .execute()
-    //             .await
-    //             .map_err(|e| {
-    //                 Error::new(ErrorDetails::ClickHouseQuery {
-    //                     message: format!("Failed to insert API stats: {}", e),
-    //                 })
-    //             })?;
-    //     }
-    //     ClickHouseConnectionInfo::Mock { .. } => {
-    //         // Mock implementation - do nothing or log
-    //     }
-    //     ClickHouseConnectionInfo::Disabled => {
-    //         // Skip if disabled
-    //     }
-    // }
-
+    // Increment usage counter
+    let usage_query = format!(
+        r#"
+        ALTER TABLE AUTHCode
+        UPDATE usage_count = usage_count + 1
+        WHERE auth_code = '{auth_code}'
+    "#
+    );
+    app_state
+        .clickhouse_connection_info
+        .run_query_synchronous_no_params(usage_query.to_string())
+        .await?;
     Ok(())
 }

@@ -1,4 +1,4 @@
-use crate::auth::token_validation::validate_auth_code_with_cache;
+use crate::auth::token_validation::{increment_usage_and_stats, validate_auth_code_with_cache};
 // tensorzero-core/src/auth/mod.rs
 use crate::error::{Error, ErrorDetails};
 use crate::gateway_util::AppStateData;
@@ -96,34 +96,7 @@ pub async fn authenticate_request(
     request.extensions_mut().insert(auth_info.clone());
 
     // Increment usage counter and API stats
-    // increment_usage_and_stats(auth_code, &auth_info, &app_state).await?;
+    increment_usage_and_stats(auth_code, &app_state).await?;
 
     Ok(next.run(request).await)
 }
-// pub async fn authenticate_request(
-//     State(app_state): State<AppStateData>,
-//     headers: HeaderMap,
-//     mut request: Request,
-//     next: Next,
-// ) -> Result<Response, Error> {
-//     // Extract the auth code from headers
-//     let auth_code = headers
-//         .get(TUPLEAP_AUTHCODE_HEADER)
-//         .and_then(|h| h.to_str().ok())
-//         .ok_or_else(|| {
-//             Error::new(ErrorDetails::ApiKeyMissing {
-//                 provider_name: "TUPLEAP_AUTHCODE".to_string(),
-//             })
-//         })?;
-
-//     // Validate the auth code and extract tenant/user info
-//     let auth_info = validate_auth_code(auth_code, &app_state).await?;
-
-//     // Add authentication info to request extensions
-//     request.extensions_mut().insert(auth_info);
-
-//     // Increment usage metrics
-//     increment_usage_counter(auth_code, &app_state).await?;
-
-//     Ok(next.run(request).await)
-// }
