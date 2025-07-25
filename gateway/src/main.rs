@@ -261,7 +261,12 @@ async fn main() {
         .route(
             "/metrics",
             get(move || std::future::ready(metrics_handle.render())),
-        );
+        )
+        // Apply authentication middleware to all protected routes
+        .layer(axum::middleware::from_fn_with_state(
+            app_state.clone(),
+            tensorzero_core::auth::authenticate_request,
+        ));
 
     let base_path = config.gateway.base_path.as_deref().unwrap_or("/");
     if !base_path.starts_with("/") {

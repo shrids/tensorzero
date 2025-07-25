@@ -2,15 +2,18 @@ use std::future::IntoFuture;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::extract::{rejection::JsonRejection, FromRequest, Json, Request};
 use axum::routing::post;
 use axum::Router;
+use moka::future::Cache;
 use reqwest::{Client, Proxy};
 use serde::de::DeserializeOwned;
 use tokio::sync::oneshot::Sender;
 use tracing::instrument;
 
+use crate::auth::AuthCache;
 use crate::clickhouse::migration_manager;
 use crate::clickhouse::ClickHouseConnectionInfo;
 use crate::config_parser::Config;
@@ -23,6 +26,7 @@ pub struct AppStateData {
     pub config: Arc<Config<'static>>,
     pub http_client: Client,
     pub clickhouse_connection_info: ClickHouseConnectionInfo,
+    pub auth_cache: AuthCache,
 }
 pub type AppState = axum::extract::State<AppStateData>;
 
@@ -44,11 +48,13 @@ impl AppStateData {
     ) -> Result<Self, Error> {
         let clickhouse_connection_info = setup_clickhouse(&config, clickhouse_url, false).await?;
         let http_client = setup_http_client()?;
+        let auth_cache = AuthCache::new();
 
         Ok(Self {
             config,
             http_client,
             clickhouse_connection_info,
+            auth_cache,
         })
     }
 }

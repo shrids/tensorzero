@@ -65,6 +65,7 @@ minijinja = { version = "2.10.2", features = [
     "loop_controls",
     "builtins",
 ] }
+moka = { version = "0.12", features = ["future"] }
 object_store = { workspace = true }
 rand = { workspace = true }
 reqwest = { workspace = true }

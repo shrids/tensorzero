@@ -9,6 +9,7 @@ use reqwest::header::HeaderMap;
 use reqwest_eventsource::{Event, EventSource, RequestBuilderExt};
 use serde_json::Value;
 use std::fmt::Debug;
+use tensorzero_core::auth::AuthCache;
 pub use tensorzero_core::endpoints::optimization::LaunchOptimizationParams;
 pub use tensorzero_core::endpoints::optimization::LaunchOptimizationWorkflowParams;
 use tensorzero_core::endpoints::optimization::{launch_optimization, launch_optimization_workflow};
@@ -278,6 +279,8 @@ impl ClientBuilder {
                     tracing::info!("No config file provided, so only default functions will be available. Set `config_file` to specify your `tensorzero.toml`");
                     Arc::new(Config::default())
                 };
+                let auth_cache = AuthCache::new();
+
                 let clickhouse_connection_info =
                     setup_clickhouse(&config, clickhouse_url.clone(), true)
                         .await
@@ -302,6 +305,7 @@ impl ClientBuilder {
                                 config,
                                 http_client,
                                 clickhouse_connection_info,
+                                auth_cache,
                             },
                         },
                         timeout: *timeout,

@@ -53,6 +53,7 @@ pub async fn inference_handler(
         config,
         http_client,
         clickhouse_connection_info,
+        auth_cache: _,
     }): AppState,
     headers: HeaderMap,
     StructuredJson(openai_compatible_params): StructuredJson<OpenAICompatibleParams>,

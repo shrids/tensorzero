@@ -142,6 +142,7 @@ pub async fn inference_handler(
         config,
         http_client,
         clickhouse_connection_info,
+        auth_cache: _,
     }): AppState,
     StructuredJson(params): StructuredJson<Params>,
 ) -> Result<Response<Body>, Error> {
@@ -203,7 +204,6 @@ pub async fn inference(
     params: Params,
 ) -> Result<InferenceOutput, Error> {
     let span = tracing::Span::current();
-    println!("Hellooooo === ==== ===. ");
     tracing::info!("TensorGateway Inference enpoint invoked {:?}", params);
 
     if let Some(function_name) = &params.function_name {

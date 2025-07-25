@@ -220,6 +220,9 @@ pub enum ErrorDetails {
     InvalidInferenceOutputSource {
         source: String,
     },
+    InvalidAuthToken {
+        provider_name: String,
+    },
     ObjectStoreWrite {
         message: String,
         path: StoragePath,
@@ -472,6 +475,7 @@ impl ErrorDetails {
             ErrorDetails::InferenceNotFound { .. } => tracing::Level::WARN,
             ErrorDetails::InferenceServer { .. } => tracing::Level::ERROR,
             ErrorDetails::InferenceTimeout { .. } => tracing::Level::WARN,
+            ErrorDetails::InvalidAuthToken { .. } => tracing::Level::ERROR,
             ErrorDetails::ModelProviderTimeout { .. } => tracing::Level::WARN,
             ErrorDetails::ModelTimeout { .. } => tracing::Level::WARN,
             ErrorDetails::VariantTimeout { .. } => tracing::Level::WARN,
@@ -581,6 +585,7 @@ impl ErrorDetails {
             ErrorDetails::InternalError { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorDetails::InvalidBaseUrl { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorDetails::InvalidValFraction { .. } => StatusCode::BAD_REQUEST,
+            ErrorDetails::InvalidAuthToken { .. } => StatusCode::UNAUTHORIZED,
             ErrorDetails::UnsupportedContentBlockType { .. } => StatusCode::BAD_REQUEST,
             ErrorDetails::InvalidBatchParams { .. } => StatusCode::BAD_REQUEST,
             ErrorDetails::InvalidCandidate { .. } => StatusCode::INTERNAL_SERVER_ERROR,
@@ -754,6 +759,12 @@ impl std::fmt::Display for ErrorDetails {
                 write!(
                     f,
                     "Bad credentials at inference time for provider: {provider_name}. This should never happen. Please file a bug report: https://github.com/tensorzero/tensorzero/issues/new"
+                )
+            }
+            ErrorDetails::InvalidAuthToken { provider_name } => {
+                write!(
+                    f,
+                    "Bad credentials at inference time for provider: {provider_name}."
                 )
             }
             ErrorDetails::BatchInputValidation { index, message } => {
