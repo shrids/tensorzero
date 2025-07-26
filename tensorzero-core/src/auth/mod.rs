@@ -19,7 +19,7 @@ use moka::future::Cache;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-// pub mod auth_service;
+pub mod admin_token_validation;
 pub mod token_validation;
 
 const TUPLEAP_AUTHCODE_HEADER: &str = "TUPLEAP_AUTHCODE";

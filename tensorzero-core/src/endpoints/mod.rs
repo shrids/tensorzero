@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::error::{Error, ErrorDetails};
 
+pub mod auth_admin;
 pub mod batch_inference;
 pub mod datasets;
 pub mod dynamic_evaluation_run;

@@ -1,9 +1,9 @@
 // tensorzero-core/src/endpoints/auth_admin.rs
-use crate::auth::admin::validate_admin_token;
+use crate::auth::admin_token_validation::validate_admin_token;
 use crate::error::{Error, ErrorDetails};
 use crate::gateway_util::{AppState, AppStateData, StructuredJson};
 use axum::{extract::State, http::HeaderMap, response::Json};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Days, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -14,7 +14,7 @@ pub struct GenerateAuthCodeRequest {
     pub expires_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GenerateAuthCodeResponse {
     pub auth_code: String,
     pub tenant_id: String,
@@ -35,37 +35,59 @@ pub async fn generate_auth_code_handler(
     // Validate admin token
     validate_admin_token(&headers, &config)?;
 
+    // Check if the user exists.
+    let exists_query = format!(
+        "SELECT count() FROM AUTHCode WHERE tenant_id = '{0}' AND username = '{1}'",
+        request.tenant_id, request.username
+    );
+    let count_result = clickhouse_connection_info
+        .run_query_synchronous_no_params(exists_query)
+        .await?;
+    let count: u64 =
+        count_result
+            .trim()
+            .parse()
+            .map_err(|error_details: std::num::ParseIntError| {
+                Error::new(ErrorDetails::ClickHouseDeserialization {
+                    message: error_details.to_string(),
+                })
+            })?;
+
+    // If count is > 0 then we have an error.
+    if count > 0 {
+        tracing::info!(
+            "The user {0} already exists in tenant {1}",
+            request.username,
+            request.tenant_id
+        );
+        return Err(Error::new(ErrorDetails::UserAlreadyExists {
+            user_name: request.username,
+        }));
+    }
     // Generate unique auth code
     let auth_code = generate_unique_auth_code(&request.tenant_id, &request.username);
     let created_at = Utc::now();
+    let expires_at = Utc::now().checked_add_days(Days::new(30));
+
+    let created_string = created_at.format("%Y-%m-%d %H:%M:%S%.3f").to_string();
+    let expires = expires_at
+        .map(|dt| dt.format("%Y-%m-%d %H:%M:%S%.3f").to_string())
+        .unwrap_or_default();
 
     // Insert into database
-    let insert_query = "
-        INSERT INTO tupleap_auth_codes
+    let insert_query = format!(
+        r#"
+        INSERT INTO AUTHCode
         (auth_code, tenant_id, username, created_at, expires_at, created_by, is_active, usage_count)
-        VALUES (?, ?, ?, ?, ?, 'admin', 1, 0)
-    ";
+        VALUES ('{auth_code}', '{0}', '{1}', '{2}', '{3}', 'admin', 1, 0)
+        "#,
+        request.tenant_id, request.username, created_string, expires
+    );
 
-    clickhouse_connection_info
-        .execute(
-            insert_query,
-            &[
-                &auth_code,
-                &request.tenant_id,
-                &request.username,
-                &created_at.to_rfc3339(),
-                &request
-                    .expires_at
-                    .map(|dt| dt.to_rfc3339())
-                    .unwrap_or_default(),
-            ],
-        )
-        .await
-        .map_err(|e| {
-            Error::new(ErrorDetails::ClickHouseQuery {
-                message: format!("Failed to insert auth code: {}", e),
-            })
-        })?;
+    let _ = clickhouse_connection_info
+        .run_query_synchronous_no_params(insert_query.to_string())
+        .await?;
+    tracing::info!("Creating auth token for {0}.", request.username);
 
     Ok(Json(GenerateAuthCodeResponse {
         auth_code,
@@ -76,6 +98,7 @@ pub async fn generate_auth_code_handler(
     }))
 }
 
+// helper method to generate unique auth code.
 fn generate_unique_auth_code(tenant_id: &str, username: &str) -> String {
     // Create a deterministic but unique auth code
     let timestamp = Utc::now().timestamp_nanos_opt().unwrap_or(0);
@@ -93,44 +116,39 @@ fn generate_unique_auth_code(tenant_id: &str, username: &str) -> String {
 
 // Additional endpoint to list auth codes for a tenant
 #[derive(Debug, Deserialize)]
-pub struct ListAuthCodesRequest {
-    pub tenant_id: Option<String>,
-    pub username: Option<String>,
-    pub limit: Option<u32>,
+pub struct GetAuthCodesRequest {
+    pub tenant_id: String,
+    pub username: String,
 }
 
-pub async fn list_auth_codes_handler(
+pub async fn get_auth_codes_handler(
     State(AppStateData {
         config,
         clickhouse_connection_info,
         ..
     }): AppState,
     headers: HeaderMap,
-    StructuredJson(request): StructuredJson<ListAuthCodesRequest>,
-) -> Result<Json<Vec<GenerateAuthCodeResponse>>, Error> {
+    StructuredJson(request): StructuredJson<GetAuthCodesRequest>,
+) -> Result<String, Error> {
     validate_admin_token(&headers, &config)?;
+    let tenant_id = request.tenant_id.clone();
+    let user_name = request.username.clone();
 
-    let mut query = "SELECT auth_code, tenant_id, username, created_at, expires_at FROM tupleap_auth_codes WHERE is_active = 1".to_string();
-    let mut params = Vec::new();
+    tracing::info!("{0}", request.tenant_id);
 
-    if let Some(tenant_id) = &request.tenant_id {
-        query.push_str(" AND tenant_id = ?");
-        params.push(tenant_id.as_str());
-    }
+    let query = format!(
+        r#"
+        SELECT auth_code, tenant_id, username, usage_count, created_at, expires_at
+        FROM AUTHCode
+        WHERE tenant_id = '{tenant_id}' AND username = '{user_name}'
+        ORDER BY created_at DESC
+        LIMIT 1
+        FORMAT JSON
+    "#
+    );
 
-    if let Some(username) = &request.username {
-        query.push_str(" AND username = ?");
-        params.push(username.as_str());
-    }
-
-    query.push_str(" ORDER BY created_at DESC");
-
-    if let Some(limit) = request.limit {
-        query.push_str(&format!(" LIMIT {}", limit));
-    }
-
-    let results: Vec<GenerateAuthCodeResponse> = clickhouse_connection_info
-        .query(&query, &params)
+    let result = clickhouse_connection_info
+        .run_query_synchronous_no_params(query)
         .await
         .map_err(|e| {
             Error::new(ErrorDetails::ClickHouseQuery {
@@ -138,5 +156,5 @@ pub async fn list_auth_codes_handler(
             })
         })?;
 
-    Ok(Json(results))
+    Ok(result)
 }

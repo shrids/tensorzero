@@ -20,7 +20,7 @@ pub fn validate_admin_token(headers: &HeaderMap, config: &Config) -> Result<(), 
             message: "Admin token not configured".to_string(),
         })
     })?;
-
+    // check if token passed is the admin token or not.
     if admin_token != expected_token {
         return Err(Error::new(ErrorDetails::BadCredentialsPreInference {
             provider_name: "Admin".to_string(),

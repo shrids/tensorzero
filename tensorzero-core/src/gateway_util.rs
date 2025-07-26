@@ -2,12 +2,10 @@ use std::future::IntoFuture;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Duration;
 
 use axum::extract::{rejection::JsonRejection, FromRequest, Json, Request};
 use axum::routing::post;
 use axum::Router;
-use moka::future::Cache;
 use reqwest::{Client, Proxy};
 use serde::de::DeserializeOwned;
 use tokio::sync::oneshot::Sender;

@@ -11,6 +11,7 @@ use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use tensorzero_core::endpoints::auth_admin::{generate_auth_code_handler, get_auth_codes_handler};
 use tokio::signal;
 use tower_http::trace::{DefaultOnFailure, TraceLayer};
 use tracing::Level;
@@ -196,7 +197,10 @@ async fn main() {
     // Set debug mode
     error::set_debug(config.gateway.debug).expect_pretty("Failed to set debug mode");
 
-    let api_routes = Router::new()
+    let admin_routes = Router::new()
+        .route("/admin/auth/generate", post(generate_auth_code_handler))
+        .route("/admin/auth", post(get_auth_codes_handler));
+    let tupleap_auth_routes = Router::new()
         .route("/inference", post(endpoints::inference::inference_handler))
         .route(
             "/batch_inference",
@@ -210,6 +214,12 @@ async fn main() {
             "/batch_inference/{batch_id}/inference/{inference_id}",
             get(endpoints::batch_inference::poll_batch_inference_handler),
         )
+        // Apply authentication middleware to all protected routes
+        .layer(axum::middleware::from_fn_with_state(
+            app_state.clone(),
+            tensorzero_core::auth::authenticate_request,
+        ));
+    let api_routes = Router::new()
         .route(
             "/openai/v1/chat/completions",
             post(endpoints::openai_compatible::inference_handler),
@@ -261,12 +271,7 @@ async fn main() {
         .route(
             "/metrics",
             get(move || std::future::ready(metrics_handle.render())),
-        )
-        // Apply authentication middleware to all protected routes
-        .layer(axum::middleware::from_fn_with_state(
-            app_state.clone(),
-            tensorzero_core::auth::authenticate_request,
-        ));
+        );
 
     let base_path = config.gateway.base_path.as_deref().unwrap_or("/");
     if !base_path.starts_with("/") {
@@ -277,7 +282,10 @@ async fn main() {
 
     // The path was just `/` (or multiple slashes)
     let router = if base_path.is_empty() {
-        Router::new().merge(api_routes)
+        Router::new()
+            .merge(api_routes)
+            .merge(admin_routes)
+            .merge(tupleap_auth_routes)
     } else {
         Router::new().nest(base_path, api_routes)
     };

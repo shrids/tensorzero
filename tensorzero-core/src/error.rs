@@ -223,6 +223,9 @@ pub enum ErrorDetails {
     InvalidAuthToken {
         provider_name: String,
     },
+    UserAlreadyExists {
+        user_name: String,
+    },
     ObjectStoreWrite {
         message: String,
         path: StoragePath,
@@ -476,6 +479,7 @@ impl ErrorDetails {
             ErrorDetails::InferenceServer { .. } => tracing::Level::ERROR,
             ErrorDetails::InferenceTimeout { .. } => tracing::Level::WARN,
             ErrorDetails::InvalidAuthToken { .. } => tracing::Level::ERROR,
+            ErrorDetails::UserAlreadyExists { .. } => tracing::Level::ERROR,
             ErrorDetails::ModelProviderTimeout { .. } => tracing::Level::WARN,
             ErrorDetails::ModelTimeout { .. } => tracing::Level::WARN,
             ErrorDetails::VariantTimeout { .. } => tracing::Level::WARN,
@@ -586,6 +590,7 @@ impl ErrorDetails {
             ErrorDetails::InvalidBaseUrl { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorDetails::InvalidValFraction { .. } => StatusCode::BAD_REQUEST,
             ErrorDetails::InvalidAuthToken { .. } => StatusCode::UNAUTHORIZED,
+            ErrorDetails::UserAlreadyExists { .. } => StatusCode::CONFLICT,
             ErrorDetails::UnsupportedContentBlockType { .. } => StatusCode::BAD_REQUEST,
             ErrorDetails::InvalidBatchParams { .. } => StatusCode::BAD_REQUEST,
             ErrorDetails::InvalidCandidate { .. } => StatusCode::INTERNAL_SERVER_ERROR,
@@ -766,6 +771,9 @@ impl std::fmt::Display for ErrorDetails {
                     f,
                     "Bad credentials at inference time for provider: {provider_name}."
                 )
+            }
+            ErrorDetails::UserAlreadyExists { user_name } => {
+                write!(f, "User already exists in tenant: {user_name}.")
             }
             ErrorDetails::BatchInputValidation { index, message } => {
                 write!(f, "Input at index {index} failed validation: {message}",)

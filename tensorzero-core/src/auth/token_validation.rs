@@ -32,7 +32,6 @@ pub async fn validate_auth_code_with_cache(
     // First, check the cache
     if let Some(cached_info) = app_state.auth_cache.get(auth_code).await {
         tracing::info!("Found auth key in cache");
-
         return Ok(cached_info);
     }
 

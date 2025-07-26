@@ -52,6 +52,9 @@ DOCKER_BUILDKIT=1 docker buildx build \
 
 
 # Testing steps
+1. Valid token
+
+```bash
 curl -X POST http://localhost:3000/inference \
   -H "Content-Type: application/json" \
   -H "TUPLEAP_AUTHCODE: tupleap_demo001" \
@@ -66,3 +69,47 @@ curl -X POST http://localhost:3000/inference \
       ]
     }
   }' | jq .
+  ```
+
+  2. Invalid Token.
+
+```bash
+  curl -X POST http://localhost:3000/inference \
+  -H "Content-Type: application/json" \
+  -H "TUPLEAP_AUTHCODE: Invalid" \
+  -d '{
+    "function_name": "chat_tupleap_generic",
+    "input": {
+      "messages": [
+        {
+          "role": "user",
+          "content": "What is the capital of Japan?"
+        }
+      ]
+    }
+  }' | jq .
+```
+
+3. Generate Token
+```bash
+  curl -X POST http://localhost:3000/admin/auth/generate \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer I_AM_ADMIN_THE_GREAT" \
+  -d '{
+    "tenant_id": "tenant-001",
+    "username": "user009"
+  }' | jq .
+```
+
+4.  List users and tokens and usage count
+```bash
+  curl -X POST http://localhost:3000/admin/auth \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer I_AM_ADMIN_THE_GREAT" \
+  -d '{
+    "tenant_id": "tenant-001",
+    "username": "user009"
+  }' | jq .
+```
+
+
